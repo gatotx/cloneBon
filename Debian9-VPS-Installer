@@ -262,7 +262,7 @@ connect = 127.0.0.1:225
 accept = 443
 connect = 127.0.0.1:110
 cert = /etc/stunnel/stunnel.pem
-
+MyStunnelC
 
 
  # setting stunnel ports
