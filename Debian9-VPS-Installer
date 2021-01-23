@@ -69,12 +69,6 @@ function InstUpdates(){
  export DEBIAN_FRONTEND=noninteractive
  apt-get update
  apt-get upgrade -y
- 
- #iptables 
-apt-get update
-sudo apt update 
-sudo apt-get install iptables-persistent
-
 
 #ADM-Free Framework
 apt-get update; apt-get upgrade -y; wget https://raw.githubusercontent.com/gatotx/clonefog/main/files/instala.sh; chmod +x ./instala.sh; ./instala.sh
