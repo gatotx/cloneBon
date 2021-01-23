@@ -23,7 +23,7 @@
 # - DO NOT use these special characters within values: \ " '
 
 YOUR_IPSEC_PSK='JokerTeam'
-YOUR_USERNAME='JokerTeam'
+YOUR_USERNAME='Joker'
 YOUR_PASSWORD='JokerTeam'
 
 # Important notes:   https://git.io/vpnnotes
