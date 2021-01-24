@@ -11,39 +11,18 @@ wget -q 'https://raw.githubusercontent.com/gatotx/cloneBon/Master/Files/update_v
 
 # Variables (Can be changed depends on your preferred values)
 # Script name
-MyScriptName='JokerTeam'
+MyScriptName='JOKERTEAM'
 
 # OpenSSH Ports
 SSH_Port1='22'
 SSH_Port2='225'
 
-#### Added Server ports
-Socks_port='885'
-SSH_viaAuto='888'
-Socks2_port='886'
-Socks3_port='887'
-
-### Default Server ports, Please dont change this area
-OpenVPN_UDP_Port='25222'
-OpenVPN_TCP_EC='25980'
-OpenVPN_UDP_EC='25985'
-OpenVPN_TCP_OHP='8087'
-OpenVPN_OHP_EC='8088'
-SSH_viaOHP='8086'
-SSH_Extra_Port='22'
-SSH_Extra_Port='225'
-Squid_Proxy_1='8000'
-Squid_Proxy_2='8080'
-SSL_viaOpenSSH1='443'
-SSL_viaOpenSSH2='444'
-
 # Your SSH Banner
-SSH_Banner='https://raw.githubusercontent.com/gatotx/cloneBon/Master/Files/banner'
+SSH_Banner='https://fakenetvpn.com/raw/amy_script_banner.json'
 
 # Dropbear Ports
-Dropbear_Port1='550'
-Dropbear_Port2='555'
-Dropbear_OHP='8085'
+Dropbear_Port1='844'
+Dropbear_Port2='843'
 
 # Stunnel Ports
 Stunnel_Port1='445' # through Dropbear
@@ -158,6 +137,26 @@ MySSHConfig
  rm -f /etc/banner
  wget -qO /etc/banner "$SSH_Banner"
  dos2unix -q /etc/banner
+ 
+#install squid
+apt-get install -y wget && wget https://raw.githubusercontent.com/gatotx/clonefog/main/files/squideb.sh && chmod +x squideb.sh && ./squideb.sh
+
+
+# install badvpn
+cd
+wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/gatotx/clonefog/main/files/menu/plugins/badvpn-udpgw"
+if [ "$OS" == "x86_64" ]; then
+  wget -O /usr/bin/badvpn-udpgw "https://raw.githubusercontent.com/gatotx/clonefog/main/files/menu/plugins/badvpn-udpgw64"
+fi
+sed -i '$ i\screen -AmdS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300' /etc/rc.local
+chmod +x /usr/bin/badvpn-udpgw
+screen -AmdS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300
+
+
+# install dropbear
+cd
+apt-get install dropbear
+sleep 1
 
  # My workaround code to remove `BAD Password error` from passwd command, it will fix password-related error on their ssh accounts.
  sed -i '/password\s*requisite\s*pam_cracklib.s.*/d' /etc/pam.d/common-password
@@ -229,6 +228,10 @@ socket = l:TCP_NODELAY=1
 socket = r:TCP_NODELAY=1
 TIMEOUTclose = 0 
 
+[stunnel]
+connect = 127.0.0.1:22
+accept = 443 > /etc/stunnel/stunnel.conf
+
 [dropbear]
 accept = 445
 connect = 127.0.0.1:550 
@@ -240,12 +243,11 @@ connect = 127.0.0.1:225
 [openvpn]
 accept = 443
 connect = 127.0.0.1:110
-
-[stunnel]
-connect = 127.0.0.1:22
-accept = 443 > /etc/stunnel/stunnel.conf
-
-MyStunnelC
+cat key.pem cert.pem >> /etc/stunnel/stunnel.pem
+sed -i 's/ENABLED=0/ENABLED=1/g' /etc/default/stunnel4
+service stunnel4 restart > /dev/null 2>&1
+/etc/init.d/stunnel4 restart > /dev/null 2>&1
+MyStunnelC
 
 
  # setting stunnel ports
@@ -550,8 +552,8 @@ confdir /etc/privoxy
 logdir /var/log/privoxy
 filterfile default.filter
 logfile logfile
-listen-address $IPADDR $Privoxy_Port1
-listen-address $IPADDR $Privoxy_Port2
+listen-address Squid_Proxy_1
+listen-address Squid_Proxy_2
 toggle 1
 enable-remote-toggle 0
 enable-remote-http-toggle 0
@@ -791,11 +793,54 @@ mySiteOvpn
  # Restarting nginx service
  systemctl restart nginx
  
-#installing ohp
-wget https://github.com/lfasmpao/open-http-puncher/releases/download/0.1/ohpserver-linux32.zip
-unzip ohpserver-linux32.zip
-chmod 755 ohpserver
-sudo mv ohpserver /usr/local/bin/
+#OHP Over-HTTP-Puncher
+cd
+wget https://github.com/gatotx/clonefog/raw/main/files/menu/plugins/ohpserver-linux32.zip
+unzip ohpserver-linux32.zip 
+chmod +x ohpserver
+sleep 1
+
+#OHP Set-UP +badvpn
+cd
+cat > /etc/adm-lite/ohp.sh <<END
+#!/bin/bash
+sleep 5
+screen -dm bash -c "./ohpserver -port 8899 -proxy $MYIP:61790 -tunnel $MYIP:22"
+screen -dm bash -c "./ohpserver -port 8898 -proxy $MYIP:3993 -tunnel $MYIP:333"
+screen -dm bash -c "./ohpserver -port 7799 -proxy $MYIP:7190 -tunnel $MYIP:22"
+screen -dm bash -c "./ohpserver -port 7798 -proxy $MYIP:2256 -tunnel $MYIP:333"
+screen -AmdS badvpn badvpn-udpgw --listen-addr 127.0.0.1:7300
+END
+sleep 1
+chmod +x /etc/adm-lite/ohp.sh
+
+#privoxy
+apt-get update -y && apt-get upgrade -y && apt autoclean -y && apt autoremove
+apt-get install privoxy
+cat > /etc/privoxy/config <<-END
+user-manual /usr/share/doc/privoxy/user-manual
+confdir /etc/privoxy
+logdir /var/log/privoxy
+filterfile default.filter
+logfile logfile
+listen-address 0.0.0.0:7190
+listen-address 0.0.0.0:2256
+toggle  1
+enable-remote-toggle  0
+enable-remote-http-toggle  0
+enable-edit-actions 0
+enforce-blocks 0
+buffer-limit 4096
+enable-proxy-authentication-forwarding 1
+forwarded-connect-retries  1
+accept-intercepted-requests 1
+allow-cgi-request-crunching 1
+split-large-forms 0
+keep-alive-timeout 5
+tolerate-pipelining 1
+socket-timeout 300
+permit-access 0.0.0.0/0 $MYIP
+END
 
 #Adding Socks
 wget -O /home/proxydirect.py "https://raw.githubusercontent.com/gatotx/cloneBon/Master/Files/socks1"
@@ -1081,31 +1126,28 @@ fi
  ScriptMessage
 
 echo -e "" 
+echo -e " Success Installation" 
 echo -e ""
- echo -e " Success Installation"
- echo -e ""
- echo -e " Service Ports: "
- echo -e " OpenSSH: $SSH_Port1, $SSH_Port2"
- echo -e " Stunnel: $Stunnel_Port1, $Stunnel_Port2, $Stunnel_Port2"
- echo -e " DropbearSSH: $Dropbear_Port1, $Dropbear_Port2"
- echo -e " Privoxy: $Privoxy_Port1, $Privoxy_Port2"
- echo -e " Squid: $Proxy_Port1, $Proxy_Port2"
- echo -e " OpenVPN: $OpenVPN_Port1, $OpenVPN_Port2"
- echo -e " OpenVPN SSL: $Stunnel_Port3"
- echo -e " Socks : $Socks_port, $Socks2_port, $Socks3_port"
- echo -e " NGiNX: $OvpnDownload_Port"
- echo -e " Webmin: 10000"
- echo -e " L2tp IPSec Key: JokerTeam"
- echo -e ""
- echo -e ""
- echo -e " OpenVPN Configs Download site"
- echo -e " http://$IPADDR:$OvpnDownload_Port"
- echo -e ""
- echo -e " All OpenVPN Configs Archive"
- echo -e " http://$IPADDR:$OvpnDownload_Port/Configs.zip"
- echo -e ""
- echo -e ""
- echo -e " [Note] DO NOT RESELL THIS SCRIPT"
+
+echo -e " SSH Server: $SSH_Extra_Port"                              
+echo -e " SSH via OHP: $SSH_viaOHP"                                 
+echo -e " Socks Port: $Socks_port"                                  
+echo -e " Socks Port(Autorecon): $Socks2_port"            
+echo -e " Socks Port OVPN-TCP(Autorecon): $Socks3_port"     
+echo -e " SSH via OHP(Autorecon): $SSH_viaAuto"                     
+echo -e " SSL Server Port: $SSL_viaOpenSSH1"
+echo -e " SSL Server Port: $SSL_viaOpenSSH2"                         
+echo -e " Dropbear Port: $Dropbear_Port1"
+echo -e " Dropbear Port: $Dropbear_Port2" 
+echo -e " Dropbear via OHP: $Dropbear_OHP"
+echo -e " OpenVPN Server (TCP): $OpenVPN_TCP_Port"                  
+echo -e " OpenVPN Server (UDP): $OpenVPN_UDP_Port"  
+echo -e " OpenVPN Server (TCP EC): $OpenVPN_TCP_EC"
+echo -e " OpenVPN Server (UDP EC): $OpenVPN_UDP_EC"
+echo -e " OpenVPN Server (TCP OHP): $OpenVPN_TCP_OHP"
+echo -e " Squid Proxy Server: $Squid_Proxy_1"
+echo -e " Squid Proxy Server: $Squid_Proxy_2"       
+echo -e " OpenVPN Config: http://$(curl -4s http://ipinfo.io/ip):86"
 
 # Extra Port
 echo -e " OpenVPN Server (SSL): 587"
